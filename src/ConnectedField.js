@@ -1,49 +1,28 @@
 // @flow
-import React, { Component, createElement } from 'react'
+import React from 'react'
 import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
 import createFieldProps from './createFieldProps'
-import onChangeValue from './events/onChangeValue'
-import { dataKey } from './util/eventConsts'
 import plain from './structure/plain'
-import isReactNative from './isReactNative'
+import onChangeValue from './events/onChangeValue'
 import type { ElementRef } from 'react'
 import type { Structure } from './types.js.flow'
-import type { Props } from './ConnectedField.types'
+import type { Props } from './ConnectedFields.types'
 import validateComponentProp from './util/validateComponentProp'
-import isEvent from './events/isEvent'
 
 const propsToNotUpdateFor = ['_reduxForm']
 
-const isObject = entity => entity && typeof entity === 'object'
-
-const isFunction = entity => entity && typeof entity === 'function'
-
-const eventPreventDefault = event => {
-  if (isObject(event) && isFunction(event.preventDefault)) {
-    event.preventDefault()
-  }
+interface State {
+  prepareEventHandlerIfNecessary: (newProps: Props) => void;
 }
 
-const eventDataTransferGetData = (event, key) => {
-  if (isObject(event) && isObject(event.dataTransfer) && isFunction(event.dataTransfer.getData)) {
-    return event.dataTransfer.getData(key)
-  }
-}
+export default function createConnectedFields(structure: Structure<any, any>) {
+  const { deepEqual, getIn, size } = structure
 
-const eventDataTransferSetData = (event, key, value) => {
-  if (isObject(event) && isObject(event.dataTransfer) && isFunction(event.dataTransfer.setData)) {
-    event.dataTransfer.setData(key, value)
-  }
-}
-
-function createConnectedField<L, M>(structure: Structure<L, M>) {
-  const { deepEqual, getIn } = structure
   const getSyncError = (syncErrors: Object, name: string) => {
-    const error = plain.getIn(syncErrors, name)
     // Because the error for this field might not be at a level in the error structure where
     // it can be set directly, it might need to be unwrapped from the _error property
-    return error && error._error ? error._error : error
+    return plain.getIn(syncErrors, `${name}._error`) || plain.getIn(syncErrors, name)
   }
 
   const getSyncWarning = (syncWarnings: Object, name: string) => {
@@ -53,8 +32,42 @@ function createConnectedField<L, M>(structure: Structure<L, M>) {
     return warning && warning._warning ? warning._warning : warning
   }
 
-  class ConnectedField extends Component<Props> {
+  class ConnectedFields extends React.Component<Props, State> {
+    onChangeFns = {}
+    onFocusFns = {}
+    onBlurFns = {}
     ref: ElementRef<any> = React.createRef()
+
+    constructor(props: Props) {
+      super(props)
+      this.state = {
+        prepareEventHandlerIfNecessary: this.prepareEventHandlerIfNecessary.bind(this)
+      }
+      this.prepareEventHandlers(props)
+    }
+
+    prepareEventHandlers = ({ names }: Props) =>
+      names.forEach(name => {
+        this.onChangeFns[name] = event => this.handleChange(name, event)
+        this.onFocusFns[name] = () => this.handleFocus(name)
+        this.onBlurFns[name] = event => this.handleBlur(name, event)
+      })
+
+    static getDerivedStateFromProps(nextProps: Props, state: State) {
+      state.prepareEventHandlerIfNecessary(nextProps)
+      return null
+    }
+
+    prepareEventHandlerIfNecessary(nextProps: Props) {
+      if (
+        this.props.names !== nextProps.names &&
+        (size(this.props.names) !== size(nextProps.names) ||
+          nextProps.names.some(nextName => !this.props._fields[nextName]))
+      ) {
+        // names has changed. The cached event handlers need to be updated
+        this.prepareEventHandlers(nextProps)
+      }
+    }
 
     shouldComponentUpdate(nextProps: Props) {
       const nextPropsKeys = Object.keys(nextProps)
@@ -66,9 +79,6 @@ function createConnectedField<L, M>(structure: Structure<L, M>) {
         nextProps.children ||
         nextPropsKeys.length !== thisPropsKeys.length ||
         nextPropsKeys.some(prop => {
-          if (~(nextProps.immutableProps || []).indexOf(prop)) {
-            return this.props[prop] !== nextProps[prop]
-          }
           return (
             !~propsToNotUpdateFor.indexOf(prop) && !deepEqual(this.props[prop], nextProps[prop])
           )
@@ -76,257 +86,126 @@ function createConnectedField<L, M>(structure: Structure<L, M>) {
       )
     }
 
-    isPristine = (): boolean => this.props.pristine
+    isDirty(): boolean {
+      const { _fields } = this.props
+      return Object.keys(_fields).some(name => _fields[name].dirty)
+    }
 
-    getValue = (): any => this.props.value
+    getValues(): Object {
+      const { _fields } = this.props
+      return Object.keys(_fields).reduce(
+        (accumulator, name) => plain.setIn(accumulator, name, _fields[name].value),
+        {}
+      )
+    }
 
-    getRenderedComponent(): React.Component<any, any> {
+    getRenderedComponent() {
       return this.ref.current
     }
 
-    handleChange = (event: any) => {
-      const {
+    handleChange = (name: string, event: any): void => {
+      const { dispatch, parse, _reduxForm } = this.props
+      const value = onChangeValue(event, { name, parse })
+
+      dispatch(_reduxForm.change(name, value))
+
+      // call post-change callback
+      if (_reduxForm.asyncValidate) {
+        _reduxForm.asyncValidate(name, value, 'change')
+      }
+    }
+
+    handleFocus = (name: string): void => {
+      const { dispatch, _reduxForm } = this.props
+      dispatch(_reduxForm.focus(name))
+    }
+
+    handleBlur = (name: string, event: any): void => {
+      const { dispatch, parse, _reduxForm } = this.props
+      const value = onChangeValue(event, {
         name,
-        dispatch,
-        parse,
-        normalize,
-        onChange,
-        _reduxForm,
-        value: previousValue
-      } = this.props
-      const newValue = onChangeValue(event, { name, parse, normalize })
+        parse
+      })
 
-      let defaultPrevented = false
-      if (onChange) {
-        // Can't seem to find a way to extend Event in React Native,
-        // thus I simply avoid adding preventDefault() in a RN environment
-        // to prevent the following error:
-        // `One of the sources for assign has an enumerable key on the prototype chain`
-        // Reference: https://github.com/facebook/react-native/issues/5507
-        if (!isReactNative && isEvent(event)) {
-          onChange(
-            {
-              ...event,
-              preventDefault: () => {
-                defaultPrevented = true
-                return eventPreventDefault(event)
-              }
-            },
-            newValue,
-            previousValue,
-            name
-          )
-        } else {
-          const onChangeResult = onChange(event, newValue, previousValue, name)
-          // Return value of change handler affecting preventDefault is RN
-          // specific behavior.
-          if (isReactNative) {
-            defaultPrevented = onChangeResult
-          }
-        }
-      }
-      if (!defaultPrevented) {
-        // dispatch change action
-        dispatch(_reduxForm.change(name, newValue))
+      // dispatch blur action
+      dispatch(_reduxForm.blur(name, value))
 
-        // call post-change callback
-        if (_reduxForm.asyncValidate) {
-          _reduxForm.asyncValidate(name, newValue, 'change')
-        }
-      }
-    }
-
-    handleFocus = (event: any) => {
-      const { name, dispatch, onFocus, _reduxForm } = this.props
-
-      let defaultPrevented = false
-      if (onFocus) {
-        if (!isReactNative) {
-          onFocus(
-            {
-              ...event,
-              preventDefault: () => {
-                defaultPrevented = true
-                return eventPreventDefault(event)
-              }
-            },
-            name
-          )
-        } else {
-          defaultPrevented = onFocus(event, name)
-        }
-      }
-
-      if (!defaultPrevented) {
-        dispatch(_reduxForm.focus(name))
-      }
-    }
-
-    handleBlur = (event: any) => {
-      const {
-        name,
-        dispatch,
-        parse,
-        normalize,
-        onBlur,
-        _reduxForm,
-        _value,
-        value: previousValue
-      } = this.props
-      let newValue = onChangeValue(event, { name, parse, normalize })
-
-      // for checkbox and radio, if the value property of checkbox or radio equals
-      // the value passed by blur event, then fire blur action with previousValue.
-      if (newValue === _value && _value !== undefined) {
-        newValue = previousValue
-      }
-
-      let defaultPrevented = false
-      if (onBlur) {
-        if (!isReactNative) {
-          onBlur(
-            {
-              ...event,
-              preventDefault: () => {
-                defaultPrevented = true
-                return eventPreventDefault(event)
-              }
-            },
-            newValue,
-            previousValue,
-            name
-          )
-        } else {
-          defaultPrevented = onBlur(event, newValue, previousValue, name)
-        }
-      }
-
-      if (!defaultPrevented) {
-        // dispatch blur action
-        dispatch(_reduxForm.blur(name, newValue))
-
-        // call post-blur callback
-        if (_reduxForm.asyncValidate) {
-          _reduxForm.asyncValidate(name, newValue, 'blur')
-        }
-      }
-    }
-
-    handleDragStart = (event: any) => {
-      const { name, onDragStart, value } = this.props
-      eventDataTransferSetData(event, dataKey, value == null ? '' : value)
-
-      if (onDragStart) {
-        onDragStart(event, name)
-      }
-    }
-
-    handleDrop = (event: any) => {
-      const { name, dispatch, onDrop, _reduxForm, value: previousValue } = this.props
-      const newValue = eventDataTransferGetData(event, dataKey)
-
-      let defaultPrevented = false
-      if (onDrop) {
-        onDrop(
-          {
-            ...event,
-            preventDefault: () => {
-              defaultPrevented = true
-              return eventPreventDefault(event)
-            }
-          },
-          newValue,
-          previousValue,
-          name
-        )
-      }
-
-      if (!defaultPrevented) {
-        // dispatch change action
-        dispatch(_reduxForm.change(name, newValue))
-        eventPreventDefault(event)
+      // call post-blur callback
+      if (_reduxForm.asyncValidate) {
+        _reduxForm.asyncValidate(name, value, 'blur')
       }
     }
 
     render() {
-      const {
-        component,
-        forwardRef,
-        name,
-        // remove props that are part of redux internals:
-        _reduxForm, // eslint-disable-line no-unused-vars
-        normalize, // eslint-disable-line no-unused-vars
-        onBlur, // eslint-disable-line no-unused-vars
-        onChange, // eslint-disable-line no-unused-vars
-        onFocus, // eslint-disable-line no-unused-vars
-        onDragStart, // eslint-disable-line no-unused-vars
-        onDrop, // eslint-disable-line no-unused-vars
-        immutableProps, // eslint-disable-line no-unused-vars
-        ...rest
-      } = this.props
-      const { custom, ...props } = createFieldProps(structure, name, {
-        ...rest,
-        form: _reduxForm.form,
-        onBlur: this.handleBlur,
-        onChange: this.handleChange,
-        onDrop: this.handleDrop,
-        onDragStart: this.handleDragStart,
-        onFocus: this.handleFocus
-      })
+      const { component, forwardRef, _fields, _reduxForm, ...rest } = this.props
+      const { sectionPrefix, form } = _reduxForm
+      const { custom, ...props } = Object.keys(_fields).reduce((accumulator, name) => {
+        const connectedProps = _fields[name]
+        const { custom, ...fieldProps } = createFieldProps(structure, name, {
+          ...connectedProps,
+          ...rest,
+          form,
+          onBlur: this.onBlurFns[name],
+          onChange: this.onChangeFns[name],
+          onFocus: this.onFocusFns[name]
+        })
+        accumulator.custom = custom
+        const fieldName = sectionPrefix ? name.replace(`${sectionPrefix}.`, '') : name
+        return plain.setIn(accumulator, fieldName, fieldProps)
+      }, {})
       if (forwardRef) {
-        custom.ref = this.ref
+        props.ref = this.ref
       }
-      if (typeof component === 'string') {
-        const { input, meta } = props // eslint-disable-line no-unused-vars
-        // flatten input into other props
-        return createElement(component, { ...input, ...custom })
-      } else {
-        return createElement(component, { ...props, ...custom })
-      }
+
+      return React.createElement(component, { ...props, ...custom })
     }
   }
 
-  ConnectedField.propTypes = {
+  ConnectedFields.propTypes = {
     component: validateComponentProp,
+    _fields: PropTypes.object.isRequired,
     props: PropTypes.object
   }
 
   const connector = connect(
     (state, ownProps) => {
       const {
-        name,
+        names,
         _reduxForm: { initialValues, getFormState }
       } = ownProps
       const formState = getFormState(state)
-      const initialState = getIn(formState, `initial.${name}`)
-      const initial =
-        initialState !== undefined ? initialState : initialValues && getIn(initialValues, name)
-      const value = getIn(formState, `values.${name}`)
-      const submitting = getIn(formState, 'submitting')
-      const syncError = getSyncError(getIn(formState, 'syncErrors'), name)
-      const syncWarning = getSyncWarning(getIn(formState, 'syncWarnings'), name)
-      const pristine = deepEqual(value, initial)
       return {
-        asyncError: getIn(formState, `asyncErrors.${name}`),
-        asyncValidating: getIn(formState, 'asyncValidating') === name,
-        dirty: !pristine,
-        pristine,
-        state: getIn(formState, `fields.${name}`),
-        submitError: getIn(formState, `submitErrors.${name}`),
-        submitFailed: getIn(formState, 'submitFailed'),
-        submitting,
-        syncError,
-        syncWarning,
-        initial,
-        value,
-        _value: ownProps.value // save value passed in (for radios)
+        _fields: names.reduce((accumulator, name) => {
+          const initialState = getIn(formState, `initial.${name}`)
+          const initial =
+            initialState !== undefined ? initialState : initialValues && getIn(initialValues, name)
+          const value = getIn(formState, `values.${name}`)
+          const syncError = getSyncError(getIn(formState, 'syncErrors'), name)
+          const syncWarning = getSyncWarning(getIn(formState, 'syncWarnings'), name)
+          const submitting = getIn(formState, 'submitting')
+          const pristine = value === initial
+          accumulator[name] = {
+            asyncError: getIn(formState, `asyncErrors.${name}`),
+            asyncValidating: getIn(formState, 'asyncValidating') === name,
+            dirty: !pristine,
+            initial,
+            pristine,
+            state: getIn(formState, `fields.${name}`),
+            submitError: getIn(formState, `submitErrors.${name}`),
+            submitFailed: getIn(formState, 'submitFailed'),
+            submitting,
+            syncError,
+            syncWarning,
+            value,
+            _value: ownProps.value // save value passed in (for radios)
+          }
+          return accumulator
+        }, {})
       }
     },
     undefined,
     undefined,
     { forwardRef: true }
   )
-  return connector(ConnectedField)
+  return connector(ConnectedFields)
 }
-
-export default createConnectedField
