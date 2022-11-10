@@ -3393,7 +3393,7 @@ const describeReduxForm = (name, structure, combineReducers, setup) => {
         render() {
           return (
             <div>
-              <Decorated {...this.state} />}
+              <Decorated {...this.state} />
               <button onClick={() => this.setState({ max: this.state.max + 1 })}>Increment</button>
             </div>
           )
