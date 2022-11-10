@@ -12,6 +12,10 @@ import validateComponentProp from './util/validateComponentProp'
 
 const propsToNotUpdateFor = ['_reduxForm']
 
+interface State {
+  prepareEventHandlerIfNecessary: (newProps: Props) => void;
+}
+
 export default function createConnectedFields(structure: Structure<any, any>) {
   const { deepEqual, getIn, size } = structure
 
@@ -28,7 +32,7 @@ export default function createConnectedFields(structure: Structure<any, any>) {
     return warning && warning._warning ? warning._warning : warning
   }
 
-  class ConnectedFields extends React.Component<Props> {
+  class ConnectedFields extends React.Component<Props, State> {
     onChangeFns = {}
     onFocusFns = {}
     onBlurFns = {}
@@ -36,6 +40,9 @@ export default function createConnectedFields(structure: Structure<any, any>) {
 
     constructor(props: Props) {
       super(props)
+      this.state = {
+        prepareEventHandlerIfNecessary: this.prepareEventHandlerIfNecessary.bind(this)
+      }
       this.prepareEventHandlers(props)
     }
 
@@ -46,7 +53,12 @@ export default function createConnectedFields(structure: Structure<any, any>) {
         this.onBlurFns[name] = event => this.handleBlur(name, event)
       })
 
-    UNSAFE_componentWillReceiveProps(nextProps: Props) {
+    static getDerivedStateFromProps(nextProps: Props, state: State) {
+      state.prepareEventHandlerIfNecessary(nextProps)
+      return null
+    }
+
+    prepareEventHandlerIfNecessary(nextProps: Props) {
       if (
         this.props.names !== nextProps.names &&
         (size(this.props.names) !== size(nextProps.names) ||
@@ -93,7 +105,10 @@ export default function createConnectedFields(structure: Structure<any, any>) {
 
     handleChange = (name: string, event: any): void => {
       const { dispatch, parse, _reduxForm } = this.props
-      const value = onChangeValue(event, { name, parse })
+      const value = onChangeValue(event, {
+        name,
+        parse
+      })
 
       dispatch(_reduxForm.change(name, value))
 
@@ -110,7 +125,10 @@ export default function createConnectedFields(structure: Structure<any, any>) {
 
     handleBlur = (name: string, event: any): void => {
       const { dispatch, parse, _reduxForm } = this.props
-      const value = onChangeValue(event, { name, parse })
+      const value = onChangeValue(event, {
+        name,
+        parse
+      })
 
       // dispatch blur action
       dispatch(_reduxForm.blur(name, value))
@@ -142,7 +160,10 @@ export default function createConnectedFields(structure: Structure<any, any>) {
         props.ref = this.ref
       }
 
-      return React.createElement(component, { ...props, ...custom })
+      return React.createElement(component, {
+        ...props,
+        ...custom
+      })
     }
   }
 
@@ -190,7 +211,9 @@ export default function createConnectedFields(structure: Structure<any, any>) {
     },
     undefined,
     undefined,
-    { forwardRef: true }
+    {
+      forwardRef: true
+    }
   )
   return connector(ConnectedFields)
 }
