@@ -130,23 +130,6 @@
       "git add"
     ]
   },
-  "jest": {
-    "collectCoverageFrom": [
-      "src/**/*.js",
-      "!src/**/__tests__/**/*.js"
-    ],
-    "coverageReporters": [
-      "text",
-      "lcov",
-      "html"
-    ],
-    "coveragePathIgnorePatterns": [
-      "/node_modules/",
-      "/dist/"
-    ],
-    "testRegex": "__tests__/.*\\.spec\\.js$",
-    "testEnvironment": "jsdom"
-  },
   "funding": {
     "type": "opencollective",
     "url": "https://opencollective.com/redux-form"
