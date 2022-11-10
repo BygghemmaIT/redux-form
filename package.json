@@ -9,7 +9,7 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "https://github.com/redux-form/redux-form"
+    "url": "https://github.com/BygghemmaIT/redux-form"
   },
   "volta": {
     "node": "18.12.1",
@@ -49,9 +49,9 @@
   "author": "Erik Rasmussen <rasmussenerik@gmail.com> (https://github.com/erikras)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/redux-form/redux-form/issues"
+    "url": "https://github.com/BygghemmaIT/redux-form/issues"
   },
-  "homepage": "https://redux-form.com/",
+  "homepage": "https://github.com/BygghemmaIT",
   "dependencies": {
     "es6-error": "^4.1.1",
     "hoist-non-react-statics": "^3.3.2",
@@ -133,10 +133,6 @@
       "prettier --write",
       "git add"
     ]
-  },
-  "funding": {
-    "type": "opencollective",
-    "url": "https://opencollective.com/redux-form"
   },
   "husky": {
     "hooks": {
