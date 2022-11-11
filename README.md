@@ -25,10 +25,6 @@ enable an html form in [React](https://github.com/facebook/react) to use
 
 ---
 
-💰**Psst!! Do you know React and Redux? [Sign up with Triplebyte](https://triplebyte.com/a/V6j0KPS/rf) to get offers from top tech companies!** 💰
-
----
-
 ## ⚠️ ATTENTION ⚠️
 
 If you're just getting started with your application and are looking for a form solution, the [general consensus of the community](https://twitter.com/acemarke/status/1124771065115185152) is that you should _not_ put your form state in Redux. The author of Redux Form took all of the lessons he learned about form use cases from maintaining Redux Form and built [🏁 React Final Form](https://github.com/final-form/react-final-form#-react-final-form), which he recommends you use if you are just starting your project. It's also pretty easy to migrate to from Redux Form, because the `<Field>` component APIs are so similar. [Here is a blog post](https://codeburst.io/final-form-the-road-to-the-checkered-flag-cd9b75c25fe) where he explains his reasoning, or [there are two talks](https://github.com/final-form/react-final-form#videos) if you prefer video. [Formik](https://jaredpalmer.com/formik/) is also a nice solution.
