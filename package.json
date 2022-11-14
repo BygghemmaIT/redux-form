@@ -1,6 +1,6 @@
 {
   "name": "@bygghemmait/redux-form",
-  "version": "8.5.0",
+  "version": "8.5.1",
   "description": "A higher order component decorator for forms using Redux and React",
   "main": "./lib/index.js",
   "types": "./types/index.d.ts",
@@ -129,6 +129,7 @@
     "es",
     "lib",
     "dist",
+    "types",
     "immutable.js",
     "*.js.flow"
   ],
