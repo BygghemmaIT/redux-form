@@ -1,6 +1,6 @@
 import { Context, Component, ComponentType, SyntheticEvent } from 'react'
 import { Dispatch } from 'redux'
-import { FieldType, FormErrors, FormStateMap, FormWarnings, RegisteredFieldState } from '../types'
+import { FieldType, FormErrors, FormStateMap, FormWarnings, RegisteredFieldState } from './index'
 import { FormState } from './reducer'
 import { Validator } from './Field'
 

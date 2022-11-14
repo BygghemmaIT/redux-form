@@ -1,5 +1,5 @@
 import { Component, ComponentType } from 'react'
-import { Validator } from '../types'
+import { Validator } from './index'
 
 interface _BaseFieldArrayProps<P = {}, FieldValue = any> {
   name: string

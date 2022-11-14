@@ -1,4 +1,4 @@
-import { FormErrors, GetFormState } from '../types'
+import { FormErrors, GetFormState } from './index'
 
 export type DataSelector<FormData = {}, State = {}> = (
   formName: string,

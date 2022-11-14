@@ -1,5 +1,5 @@
 import { Action } from 'redux'
-import { FormErrors, FormWarnings, FieldType } from '../types'
+import { FormErrors, FormWarnings, FieldType } from './index'
 
 export interface FormAction extends Action {
   meta?: any

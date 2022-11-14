@@ -3,6 +3,7 @@
   "version": "8.4.0",
   "description": "A higher order component decorator for forms using Redux and React",
   "main": "./lib/index.js",
+  "types": "./types/index.d.ts",
   "module": "./es/index.js",
   "modules.root": "./es",
   "jsnext:main": "./es/index.js",

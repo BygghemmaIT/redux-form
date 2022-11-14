@@ -1,5 +1,5 @@
 import { Component, FormHTMLAttributes } from 'react'
-import { FormSubmitHandler } from '../types'
+import { FormSubmitHandler } from './index'
 
 interface FormSubmitProp<FormData = {}, P = {}, ErrorType = string> {
   onSubmit?: FormSubmitHandler<FormData, P, ErrorType>
